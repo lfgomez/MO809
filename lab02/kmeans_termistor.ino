@@ -68,18 +68,18 @@ float resistencia_termistor;
 int i = 0;
 
 //Variaveis do modelo
-float threshold;
+double* threshold;
 int cluster = 0;
 
 //Vamos criar uma funcao para formatar os dados no formato JSON
 char *jsonMQTTmsgDATA(const char *device_id, const char *metric, float value) {
-	const int capacity = JSON_OBJECT_SIZE(3);
-	StaticJsonDocument<capacity> jsonMSG;
-	jsonMSG["deviceId"] = device_id;
-	jsonMSG["metric"] = metric;
-	jsonMSG["value"] = value;
-	serializeJson(jsonMSG, bufferJ);
-	return bufferJ;
+  const int capacity = JSON_OBJECT_SIZE(3);
+  StaticJsonDocument<capacity> jsonMSG;
+  jsonMSG["deviceId"] = device_id;
+  jsonMSG["metric"] = metric;
+  jsonMSG["value"] = value;
+  serializeJson(jsonMSG, bufferJ);
+  return bufferJ;
 }
 
 //Criando os objetos de conexão com a rede e com o servidor MQTT.
@@ -151,7 +151,10 @@ void kmeans(Data* dataset, int num_data, Cluster* clusters, int num_clusters) {
         clusters[i].centroid = dataset[i];
         clusters[i].num_points = 0;
     }
-    clusters[1].centroid = dataset[int(NUM_DATA/2)];
+  
+    for (int i = 0; i < num_clusters; i++){
+      clusters[i].centroid = dataset[int(NUM_DATA)/num_clusters];
+    }
 
     bool changes = true;
     int iterations = 0;
@@ -212,7 +215,7 @@ void setup()
 
 }
 
-float trainning_kmeans(){
+double* trainning_kmeans(){
   Data dataset[NUM_DATA];
   for (int i = 0; i < NUM_DATA; i++) {
     dataset[i].value = get_temperature();
@@ -244,7 +247,7 @@ float trainning_kmeans(){
     for (int i = 0; i < NUM_CLUSTERS - 1; i++) {
         Serial.print(thresholds[i]);
     }
-    return thresholds[0];
+    return thresholds;
 }
 
 //Funcao para calcular a temperatura baseada nos dados do termistor
@@ -274,17 +277,33 @@ void loop()
   if (!client.connected()) {
     reconnect();
   }
-  Serial.println(threshold);
+//  Serial.println(threshold);
   temperature = get_temperature();
   //Calcule a temperatura e veja em que cluster ela se encontra
-  if (temperature>threshold){
+  int cluster = 0;
+  float curr_dist = 99999.0;
+  float cluster_dist;
+  
+  for (int i = 0; i < NUM_CLUSTERS; i++){
+    cluster_dist = temperature - threshold[i];
+  
+    if (cluster_dist < 0)
+      cluster_dist = -cluster_dist;
+    
+    if (cluster_dist < curr_dist) {
+      cluster = i;
+      curr_dist = cluster_dist;
+    }
+  }
+    
+  /*if (temperature>threshold){
     cluster=1;
     digitalWrite(LED_BUILTIN, LOW);
   }
   else{
     digitalWrite(LED_BUILTIN, HIGH);
     cluster=0;
-  }
+  }*/
   //Enviando via MQTT o resultado calculado da temperatura
   mensagem = jsonMQTTmsgDATA("My_favorite_thermometer", "Celsius", temperature);
   client.publish(PUB1, mensagem); 
