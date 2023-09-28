@@ -276,21 +276,23 @@ void loop()
   
   temperature = get_temperature();
   
-//Calcule a temperatura e veja em que cluster ela se encontra
+ //Calcule a temperatura e veja em que cluster ela se encontra
   int found = 0;
+  float min_dist = 9999;
+  float dist = 0;
   cluster = 0;
-  while (cluster < NUM_CLUSTERS - 1 && !found){
-    // se for o primeiro cluster, ja vai ser menor que o primeiro threshold
-    if (cluster == 0 && temperature < thresholds[cluster]){
-      found = 1;
-    // caso contrario, eh igual ao primeiro cluster que passar o threshold
-    }else if (temperature > thresholds[cluster]){
-      found = 1;
-      cluster++; // cluster eh offset + 1 em relacao ao threshold
-    }else{
-      cluster++;
+  for(int i = 0; i < NUM_CLUSTERS - 1; i++){
+    dist = temperature - thresholds[i];
+    if (dist < 0)
+      dist = -dist;
+    if (dist < min_dist){
+      min_dist = dist;
+      cluster = i;
     }
   }
+
+  if (temperature - thresholds[cluster] > 0)
+      cluster++;
   
   if (cluster)
     digitalWrite(LED_BUILTIN, LOW);
