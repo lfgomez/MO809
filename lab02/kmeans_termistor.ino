@@ -279,11 +279,16 @@ void loop()
   //Calcule a temperatura e veja em que cluster ela se encontra
   int found = 0;
   cluster = 0;
-  while (cluster < NUM_CLUSTERS - 1 && !found)
-    if (temperature > thresholds[cluster])
+  while (cluster < NUM_CLUSTERS - 1 && !found){
+    if (temperature > thresholds[cluster]){
         found = 1;
-    else
+        // no primeiro cluster que passar a temp
+        // significa que a amostra eh do anterior
+        cluster--;
+    }else{
         cluster++;
+    }
+  }
   
   if (cluster)
     digitalWrite(LED_BUILTIN, LOW);
