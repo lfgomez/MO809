@@ -276,17 +276,19 @@ void loop()
   
   temperature = get_temperature();
   
-  //Calcule a temperatura e veja em que cluster ela se encontra
+//Calcule a temperatura e veja em que cluster ela se encontra
   int found = 0;
   cluster = 0;
   while (cluster < NUM_CLUSTERS - 1 && !found){
-    if (temperature > thresholds[cluster]){
-        found = 1;
-        // no primeiro cluster que passar a temp
-        // significa que a amostra eh do anterior
-        cluster--;
+    // se for o primeiro cluster, ja vai ser menor que o primeiro threshold
+    if (cluster == 0 && temperature < thresholds[cluster]){
+      found = 1;
+    // caso contrario, eh igual ao primeiro cluster que passar o threshold
+    }else if (temperature > thresholds[cluster]){
+      found = 1;
+      cluster++; // cluster eh offset + 1 em relacao ao threshold
     }else{
-        cluster++;
+      cluster++;
     }
   }
   
