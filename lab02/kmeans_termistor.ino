@@ -20,8 +20,8 @@
 #define RESISTOR 470   
 
 #define NUM_DATA 100
-#define NUM_CLUSTERS 3
-#define MAX_ITERATIONS 1000
+#define NUM_CLUSTERS 2
+#define MAX_ITERATIONS 10000
 
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
@@ -270,24 +270,26 @@ void loop()
   if (!client.connected()) {
     reconnect();
   }
+  // print thresholds atuais em uso
   for (int i = 0; i < NUM_CLUSTERS - 1; i++)
     Serial.println(thresholds[i]);
+  
   temperature = get_temperature();
+  
   //Calcule a temperatura e veja em que cluster ela se encontra
   int found = 0;
-  for (cluster = 0; cluster < NUM_CLUSTERS - 1 && !found; cluster++){
-    if (temperature > thresholds[cluster]){
+  cluster = 0;
+  while (cluster < NUM_CLUSTERS - 1 && !found)
+    if (temperature > thresholds[cluster])
         found = 1;
-        cluster -= 1; // quando passar do threshold, eh do cluster anterior
-    }
-  }
+    else
+        cluster++;
   
-  if (cluster> 0){
+  if (cluster)
     digitalWrite(LED_BUILTIN, LOW);
-  }
-  else{
+  else
     digitalWrite(LED_BUILTIN, HIGH);
-  }
+
   //Enviando via MQTT o resultado calculado da temperatura
   mensagem = jsonMQTTmsgDATA("My_favorite_thermometer", "Celsius", temperature);
   client.publish(PUB1, mensagem); 
