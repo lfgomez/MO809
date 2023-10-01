@@ -281,16 +281,22 @@ void loop()
   float min_dist = 9999;
   float dist = 0;
   cluster = 0;
+  // para cada threshold, queremos calcular a distancia da amostra
+  // se a distancia para o threshold mais proximo for negativa
+  // o cluster eh o cluster de mesmo index do threshold...
   for(int i = 0; i < NUM_CLUSTERS - 1; i++){
+    // checa a distancia da amostra e do threshold
     dist = temperature - thresholds[i];
+    // dist = abs(dist)
     if (dist < 0)
       dist = -dist;
+    // atualiza menor distancia e cluster associado
     if (dist < min_dist){
       min_dist = dist;
       cluster = i;
     }
   }
-
+ // ...caso contrario, eh o proximo index
   if (temperature - thresholds[cluster] > 0)
       cluster++;
   
