@@ -21,7 +21,7 @@
 
 #define NUM_DATA 100
 #define NUM_CLUSTERS 2
-#define MAX_ITERATIONS 1000
+#define MAX_ITERATIONS 10000
 
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
@@ -68,18 +68,18 @@ float resistencia_termistor;
 int i = 0;
 
 //Variaveis do modelo
-float threshold;
+double thresholds[NUM_CLUSTERS-1];
 int cluster = 0;
 
 //Vamos criar uma funcao para formatar os dados no formato JSON
 char *jsonMQTTmsgDATA(const char *device_id, const char *metric, float value) {
-	const int capacity = JSON_OBJECT_SIZE(3);
-	StaticJsonDocument<capacity> jsonMSG;
-	jsonMSG["deviceId"] = device_id;
-	jsonMSG["metric"] = metric;
-	jsonMSG["value"] = value;
-	serializeJson(jsonMSG, bufferJ);
-	return bufferJ;
+  const int capacity = JSON_OBJECT_SIZE(3);
+  StaticJsonDocument<capacity> jsonMSG;
+  jsonMSG["deviceId"] = device_id;
+  jsonMSG["metric"] = metric;
+  jsonMSG["value"] = value;
+  serializeJson(jsonMSG, bufferJ);
+  return bufferJ;
 }
 
 //Criando os objetos de conexão com a rede e com o servidor MQTT.
@@ -146,12 +146,11 @@ double distance(Data* a, Data* b) {
 //Funcao definindo o metodo kmeans
 //Nota: voce consegue melhorar a inicializacao! Ela foi escrita para funcionar bem apenas com 2 classes.
 void kmeans(Data* dataset, int num_data, Cluster* clusters, int num_clusters) {
-    // Initialize clusters with first num_clusters datapoints
+    // Initialize clusters with num_clusters datapoints
     for (int i = 0; i < num_clusters; i++) {
-        clusters[i].centroid = dataset[i];
+        clusters[i].centroid = dataset[int(NUM_DATA/num_clusters)*i];
         clusters[i].num_points = 0;
     }
-    clusters[1].centroid = dataset[int(NUM_DATA/2)];
 
     bool changes = true;
     int iterations = 0;
@@ -203,16 +202,15 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
   Serial.begin(115200);
-  //Encontrando o threshold para duas classes usando kmeans
-  //Nota: voce consegue reescrever a funcao para mais classes passando o float para um vetor.
-  threshold = trainning_kmeans();
+  //Encontrando o threshold para as classes usando kmeans
+  trainning_kmeans();
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
 }
 
-float trainning_kmeans(){
+void trainning_kmeans(){
   Data dataset[NUM_DATA];
   for (int i = 0; i < NUM_DATA; i++) {
     dataset[i].value = get_temperature();
@@ -223,7 +221,6 @@ float trainning_kmeans(){
     kmeans(dataset, NUM_DATA, clusters, NUM_CLUSTERS);
 
     // Encontrando thresholds
-    double thresholds[NUM_CLUSTERS-1];
     for (int i = 0; i < NUM_CLUSTERS - 1; i++) {
         thresholds[i] = (clusters[i].centroid.value + clusters[i+1].centroid.value) / 2;
     }
@@ -244,7 +241,6 @@ float trainning_kmeans(){
     for (int i = 0; i < NUM_CLUSTERS - 1; i++) {
         Serial.print(thresholds[i]);
     }
-    return thresholds[0];
 }
 
 //Funcao para calcular a temperatura baseada nos dados do termistor
@@ -274,17 +270,41 @@ void loop()
   if (!client.connected()) {
     reconnect();
   }
-  Serial.println(threshold);
+  // print thresholds atuais em uso
+  for (int i = 0; i < NUM_CLUSTERS - 1; i++)
+    Serial.println(thresholds[i]);
+  
   temperature = get_temperature();
-  //Calcule a temperatura e veja em que cluster ela se encontra
-  if (temperature>threshold){
-    cluster=1;
+  
+ //Calcule a temperatura e veja em que cluster ela se encontra
+  int found = 0;
+  float min_dist = 9999;
+  float dist = 0;
+  cluster = 0;
+  // para cada threshold, queremos calcular a distancia da amostra
+  // se a distancia para o threshold mais proximo for negativa
+  // o cluster eh o cluster de mesmo index do threshold...
+  for(int i = 0; i < NUM_CLUSTERS - 1; i++){
+    // checa a distancia da amostra e do threshold
+    dist = temperature - thresholds[i];
+    // dist = abs(dist)
+    if (dist < 0)
+      dist = -dist;
+    // atualiza menor distancia e cluster associado
+    if (dist < min_dist){
+      min_dist = dist;
+      cluster = i;
+    }
+  }
+ // ...caso contrario, eh o proximo index
+  if (temperature - thresholds[cluster] > 0)
+      cluster++;
+  
+  if (cluster)
     digitalWrite(LED_BUILTIN, LOW);
-  }
-  else{
+  else
     digitalWrite(LED_BUILTIN, HIGH);
-    cluster=0;
-  }
+
   //Enviando via MQTT o resultado calculado da temperatura
   mensagem = jsonMQTTmsgDATA("My_favorite_thermometer", "Celsius", temperature);
   client.publish(PUB1, mensagem); 
