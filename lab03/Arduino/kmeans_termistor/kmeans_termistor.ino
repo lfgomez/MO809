@@ -46,7 +46,7 @@ void kmeans(Data* dataset, int num_data, Cluster* clusters, int num_clusters);
 const char* USER = "";
 const char* PWD = "";
 
-const char* PUB = "kmeans";
+const char* PUB = "temperature";
 
 //Variaveis gloabais desse codigo
 char bufferJ[256];
